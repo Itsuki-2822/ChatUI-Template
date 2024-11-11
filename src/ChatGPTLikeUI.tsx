@@ -33,43 +33,64 @@ export default function ChatGPTLikeUI() {
   const [isEditingTitle, setIsEditingTitle] = useState<number | null>(null); // 編集中の会話ID
   const [editedTitle, setEditedTitle] = useState(''); // 編集中のタイトル
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (input.trim()) {
       const newUserMessage: Message = {
         id: currentConversation.messages.length + 1,
         content: input.trim(),
-        role: 'user'
-      }
-      
+        role: 'user',
+      };
+
       const updatedConversation = {
         ...currentConversation,
-        messages: [...currentConversation.messages, newUserMessage]
+        messages: [...currentConversation.messages, newUserMessage],
+      };
+
+      setCurrentConversation(updatedConversation);
+      setConversations((prevConversations) =>
+        prevConversations.map((conv) =>
+          conv.id === currentConversation.id ? updatedConversation : conv
+        )
+      );
+      setInput('');
+
+      // エージェントにメッセージを送信
+      try {
+        const response = await fetch('https://sample', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: newUserMessage.content }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const assistantResponse: Message = {
+            id: updatedConversation.messages.length + 1,
+            content: data.reply, // エージェントからの応答を使用
+            role: 'assistant',
+          };
+
+          const conversationWithResponse = {
+            ...updatedConversation,
+            messages: [...updatedConversation.messages, assistantResponse],
+          };
+
+          setCurrentConversation(conversationWithResponse);
+          setConversations((prevConversations) =>
+            prevConversations.map((conv) =>
+              conv.id === currentConversation.id ? conversationWithResponse : conv
+            )
+          );
+        } else {
+          console.error('Error from LLM agent:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Failed to send message to LLM agent:', error);
       }
-      
-      setCurrentConversation(updatedConversation)
-      setConversations(conversations.map(conv => 
-        conv.id === currentConversation.id ? updatedConversation : conv
-      ))
-      setInput('')
-      
-      // Simulate assistant response
-      setTimeout(() => {
-        const assistantResponse: Message = {
-          id: updatedConversation.messages.length + 1,
-          content: "I'm an AI assistant. I'm here to help answer your questions and assist with various tasks. How can I help you today?",
-          role: 'assistant'
-        }
-        const conversationWithResponse = {
-          ...updatedConversation,
-          messages: [...updatedConversation.messages, assistantResponse]
-        }
-        setCurrentConversation(conversationWithResponse)
-        setConversations(conversations.map(conv => 
-          conv.id === currentConversation.id ? conversationWithResponse : conv
-        ))
-      }, 1000)
     }
-  }
+  };
 
   const startNewConversation = () => {
     setIsModalOpen(true);
